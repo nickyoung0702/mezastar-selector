@@ -75,6 +75,7 @@ select,input[type=search]{width:100%;min-width:0;background:var(--panel);color:v
 .btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
 .empty{padding:28px 12px;text-align:center;color:var(--mute)}
 @media (prefers-reduced-motion:no-preference){.rc,.gc{transition:transform .12s}.rc:active,.gc:active{transform:scale(.99)}}
+.sg{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center}.sgb{font:inherit;font-size:13px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);cursor:pointer;display:inline-flex;gap:6px;align-items:baseline}.sgb small{font-size:11px;color:var(--mute)}
 </style>
 </head><body>
 
@@ -139,19 +140,29 @@ function eval_(c,opp){
 // opponents
 const OPPS=[{n:'',a:'火',b:''},{n:'',a:'水',b:''},{n:'',a:'草',b:''}];
 const tOpts='<option value="">不指定</option>'+TYPES.map(t=>`<option>${t}</option>`).join('');
-const dlist='<datalist id="dl">'+Object.keys(OPPDB).sort((x,y)=>x.localeCompare(y,'zh-Hant')).map(n=>`<option value="${n}">`).join('')+'</datalist>';
-$('#opps').innerHTML=dlist+OPPS.map((o,i)=>`<div class="opp"><div class="oh"><b>對手 ${i+1}</b><span id="ow${i}" class="tl"></span></div>
- <div class="field full"><label class="lbl" for="on${i}">輸入對手名稱(自動帶入屬性)</label><input id="on${i}" list="dl" placeholder="例:故勒頓、霜奶仙…" autocomplete="off" style="width:100%;font:inherit;padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--fg)"></div>
+const ALLN=Object.keys(OPPDB).sort((x,y)=>x.localeCompare(y,'zh-Hant'));
+$('#opps').innerHTML=OPPS.map((o,i)=>`<div class="opp"><div class="oh"><b>對手 ${i+1}</b><span id="ow${i}" class="tl"></span></div>
+ <div class="field full"><label class="lbl" for="on${i}">輸入對手名稱(自動帶入屬性)</label><input id="on${i}" placeholder="輸入名稱或其中幾個字,例:勒頓、奶仙" enterkeyhint="done" autocomplete="off" style="width:100%;font:inherit;padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--fg)"><div id="sg${i}" class="sg"></div></div>
  <div class="pick"><div class="field"><label class="lbl" for="oa${i}">屬性 1</label><select id="oa${i}">${tOpts}</select></div>
  <div class="field"><label class="lbl" for="ob${i}">屬性 2</label><select id="ob${i}">${tOpts}</select></div></div>
  <div class="row"><b>弱點</b><span id="ox${i}" class="tl"></span></div></div>`).join('');
 OPPS.forEach((o,i)=>{
   $('#oa'+i).value=o.a;$('#ob'+i).value=o.b;
   const nm=$('#on'+i),ow=$('#ow'+i);
-  nm.oninput=()=>{const e=OPPDB[nm.value.trim()];
-    if(e){$('#oa'+i).value=e.t[0];$('#ob'+i).value=e.t[1]||'';ow.innerHTML=e.u?'<span class="note">⚠ 屬性待確認,請核對</span>':'<span class="note">✓ 已帶入</span>'}
-    else ow.innerHTML=nm.value.trim()?'<span class="note">資料庫查無此名,請用屬性選單</span>':'';
-    render()};
+  const sg=$('#sg'+i);
+  const pickN=n=>{nm.value=n;apply();sg.innerHTML=''};
+  const sim=(q,n)=>{let k=0;for(const ch of new Set(q))if(n.includes(ch))k++;return k};
+  function apply(){const v=nm.value.trim(),e=OPPDB[v];
+    if(e){$('#oa'+i).value=e.t[0];$('#ob'+i).value=e.t[1]||'';ow.innerHTML=e.u?'<span class="note">⚠ 屬性待確認,請核對</span>':'<span class="note">✓ 已帶入</span>';sg.innerHTML=''}
+    else ow.innerHTML='';
+    render()}
+  function suggest(){const v=nm.value.trim();sg.innerHTML='';if(!v||OPPDB[v])return;
+    let m=ALLN.filter(n=>n.includes(v));let fuzzy=false;
+    if(!m.length){fuzzy=true;m=ALLN.map(n=>[n,sim(v,n)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,8).map(x=>x[0])}
+    if(!m.length){sg.innerHTML='<span class="note">查無此名,請用下方屬性選單</span>';return}
+    sg.innerHTML=(fuzzy?'<span class="note">查無此名,是不是:</span>':'')+m.slice(0,10).map(n=>`<button type="button" class="sgb" data-n="${n}">${n}<small>${OPPDB[n].t.join('/')}</small></button>`).join('');
+    sg.querySelectorAll('.sgb').forEach(b=>b.onclick=()=>pickN(b.dataset.n))}
+  nm.oninput=()=>{apply();suggest()};
   $('#oa'+i).onchange=$('#ob'+i).onchange=()=>{ow.innerHTML='';render()};
 });
 const oppTypes=i=>[$('#oa'+i).value,$('#ob'+i).value].filter(Boolean).filter((v,j,a)=>a.indexOf(v)===j);
